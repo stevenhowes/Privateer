@@ -1,0 +1,7 @@
+irrKlang-64bit-1.6.0/
+irrlicht-1.8.4/
+.vs/
+irrKlang.dll
+Irrlicht.dll
+assets/sounds/*.wav
+*.exe

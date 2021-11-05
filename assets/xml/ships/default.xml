@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<ship>
+	<movement>
+		<setting name="speed_increment" value="80" />
+		
+		<setting name="speed_max_standard" value="288" />
+		<setting name="speed_max_afterburn" value="576" />
+
+		<setting name="speed_decel" value="60" />
+
+		<setting name="speed_accel_standard" value="50" />
+		<setting name="speed_accel_afterburn" value="100" />
+
+		<setting name="turn_max" value="100" />
+		<setting name="pitch_max" value="100" />
+	</movement>
+</ship>
