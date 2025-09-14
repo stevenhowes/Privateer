@@ -44,14 +44,10 @@ void makeCockpit(irr::scene::ICameraSceneNode *camera, //camera
 	camera->setTarget(node->getPosition() + frv); //set target of camera (look at point) >> Zeuss - Dont forget to add the node positiob
 }
 
-void rotate(irr::scene::ISceneNode *node, irr::core::vector3df rot)
+void rotate(irr::scene::ISceneNode* node, irr::core::vector3df rot)
 {
-	irr::core::matrix4 m;
-	m.setRotationDegrees(node->getRotation());
-	irr::core::matrix4 n;
-	n.setRotationDegrees(rot);
-	m *= n;
-	node->setRotation(m.getRotationDegrees());
+	irr::core::vector3df currentRot = node->getRotation();
+	node->setRotation(currentRot + rot);
 	node->updateAbsolutePosition();
 }
 
@@ -102,9 +98,6 @@ public:
 		// Remember whether each key is down or up
 		if (event.EventType == irr::EET_KEY_INPUT_EVENT)
 			KeyIsDown[event.KeyInput.Key] = event.KeyInput.PressedDown;
-
-
-
 
 		if (event.EventType == irr::EET_MOUSE_INPUT_EVENT)
 		{
@@ -184,14 +177,9 @@ int main()
 	// create device
 	MyEventReceiver receiver;
 
-
 	IrrlichtDevice *device =
 		createDevice( video::EDT_OPENGL, dimension2d<u32>(DISPLAY_WIDTH, DISPLAY_HEIGHT), 32,
 			false, false, false, &receiver);
-
-	/*IrrlichtDevice *device =
-		createDevice(video::EDT_DIRECT3D9, dimension2d<u32>(1920, 1080), 32,
-			true, false, false, &receiver);*/
 
 	if (!device)
 	{
@@ -221,7 +209,7 @@ int main()
 	ISound* shipengineafterburn = snddevice->play2D("assets/sounds/engine2.ogg", true,true);
 
 	//set other font
-	guienv->getSkin()->setFont(guienv->getFont("assets/arial10.bmp"));
+	guienv->getSkin()->setFont(guienv->getFont("assets/fonts/default.bmp"));
 	guienv->getSkin()->setColor(gui::EGDC_BUTTON_TEXT,
 		video::SColor(255, 217, 206, 56));
 	IGUIStaticText* textTargetSpeed = guienv->addStaticText(L"XXX", rect<s32>(0, 0, 150, 20), false);
@@ -230,7 +218,7 @@ int main()
 	/* Sky Dome */
 	/**********************************************************************************************/
 	driver->setTextureCreationFlag(video::ETCF_CREATE_MIP_MAPS, false);
-	scene::ISceneNode* skydome = smgr->addSkyDomeSceneNode(driver->getTexture("assets/space/default.jpg"), 16, 8, 0.95f, 2.0f);
+	scene::ISceneNode* skydome = smgr->addSkyDomeSceneNode(driver->getTexture("assets/space/nebula1.png"), 16, 8, 0.95f, 2.0f);
 	driver->setTextureCreationFlag(video::ETCF_CREATE_MIP_MAPS, true);
 	/**********************************************************************************************/
 
@@ -252,7 +240,7 @@ int main()
 		planetnode->setScale(scale);
 		planetnode->setPosition(core::vector3df(0, 0, 50000));
 		planetnode->setMaterialFlag(EMF_LIGHTING, false);
-		planetnode->setMaterialTexture(0, driver->getTexture("assets/models/planets/pbex.png"));
+		planetnode->setMaterialTexture(0, driver->getTexture("assets/models/planets/earth.png"));
 	}
 	/**********************************************************************************************/
 
@@ -265,7 +253,12 @@ int main()
 		return 1;
 	}
 	IAnimatedMeshSceneNode* asteroidnode = smgr->addAnimatedMeshSceneNode(asteroid,skydome);
-	if (asteroidnode)
+	if (!asteroidnode)
+	{
+		device->drop();
+		return 1;
+	}
+	else
 	{
 		core::vector3df scale;
 		scale.X = 2;
@@ -277,64 +270,44 @@ int main()
 		asteroidnode->setMaterialTexture(0, driver->getTexture("assets/models/junk/asteroid.png"));
 	}
 	/**********************************************************************************************/
-//	smgr->saveScene("recent.irr", 0, skydome);
 
+	video::ITexture* sightimages = driver->getTexture("assets/hud/sight_all.png");
 
+	// Dust nodse
+	std::vector<IAnimatedMeshSceneNode*> dustnodes;
 
-//	smgr->loadScene("assets/scenes/recent.irr");
-
-	video::ITexture* sightimages = driver->getTexture("assets/sight_all.png");
-
-	// Space dust model TODO: Planet mesh is way overkill!
+	// Space dust model
 	IAnimatedMesh* dust = smgr->getMesh("assets/models/junk/dust.obj");
 	if (!dust)
 	{
 		device->drop();
 		return 1;
 	}
+	else
+	{
+		// Create 500 dust nodes
+		for (u16 i = 0; i < 500; ++i)
+		{
+			IAnimatedMeshSceneNode* dustNode = smgr->addAnimatedMeshSceneNode(dust);
+			if (dustNode != nullptr) {
+				dustnodes.push_back(dustNode);
+			}
+		}
 
-	// Create 500 dust nodes
-	std::vector<IAnimatedMeshSceneNode*> dustnodes;
-	for (u16 i = 0; i < 500; ++i)
-	{
-		dustnodes.push_back(smgr->addAnimatedMeshSceneNode(dust));
+		// Place them far away so they get re-arranged later
+		for (size_t i = 0; i < dustnodes.size(); ++i)
+		{
+			core::vector3df scale;
+			scale.X = 0.2f;
+			scale.Y = 0.2f;
+			scale.Z = 0.2f;
+			dustnodes[i]->setScale(scale);
+			dustnodes[i]->setPosition(core::vector3df(1000, 1000, 1000));
+			dustnodes[i]->setMaterialFlag(EMF_LIGHTING, false);
+			dustnodes[i]->setMaterialTexture(0, driver->getTexture("assets/models/junk/dust.png"));
+		}
 	}
 
-	// Scatter dust in a radius around the player
-	for (size_t i = 0; i < dustnodes.size(); ++i)
-	{
-		core::vector3df scale;
-		scale.X = 0.2f;
-		scale.Y = 0.2f;
-		scale.Z = 0.2f;
-		dustnodes[i]->setScale(scale);
-		dustnodes[i]->setPosition(core::vector3df((float)(rand() % 500)-250, (float)(rand() % 500) - 250, (float)(rand() % 500) - 150));
-		dustnodes[i]->setMaterialFlag(EMF_LIGHTING, false);
-		dustnodes[i]->setMaterialTexture(0, driver->getTexture("assets/models/junk/asteroid.png"));
-	}
-
-#if 0
-	/* Player ship*/
-	/**********************************************************************************************/
-	IAnimatedMesh* mesh = smgr->getMesh("assets/models/warhawk.obj");
-	if (!mesh)
-	{
-		device->drop();
-		return 1;
-	}
-	IAnimatedMeshSceneNode* node = smgr->addAnimatedMeshSceneNode( mesh );
-	if (node)
-	{
-		core::vector3df scale;
-		scale.X = 2;
-		scale.Y = 2;
-		scale.Z = 2;
-		node->setScale(scale);
-		node->setMaterialFlag(EMF_LIGHTING, false);
-		node->setMaterialTexture( 0, driver->getTexture("assets/models/warhawk.png") );
-	}
-	/**********************************************************************************************/
-#endif
 	/* Player shield*/
 	/**********************************************************************************************/
 	IAnimatedMesh* shieldmesh = smgr->getMesh("assets/models/shield.obj");
@@ -344,8 +317,11 @@ int main()
 		return 1;
 	}
 	IAnimatedMeshSceneNode* shieldnode = smgr->addAnimatedMeshSceneNode(shieldmesh);
-	if (shieldnode)
+	if (!shieldnode)
 	{
+		device->drop();
+		return 1;
+	}else{
 		core::vector3df scale;
 		scale.X = 4;
 		scale.Y = 4;
@@ -354,8 +330,6 @@ int main()
 		shieldnode->setMaterialFlag(EMF_LIGHTING, false);
 		shieldnode->setMaterialType(EMT_TRANSPARENT_ALPHA_CHANNEL);
 		shieldnode->setMaterialTexture(0, driver->getTexture("assets/models/shield.png"));
-
-
 	}
 	/**********************************************************************************************/
 
@@ -364,13 +338,6 @@ int main()
 	camera->setFarValue(50000.0f);
 	scene::ISceneNode* test = smgr->addSceneNode("empty");
 	test->setPosition(vector3df(0, 0, 0));
-
-
-
-
-
-
-
 
 	/* Store last FPS so we can show it if enabled*/
 	u16 lastFPS = -1;
@@ -384,8 +351,7 @@ int main()
 
 	while (device->run())
 	{
-
-
+		// Check dust nodes and if any are too far away, reset them.
 		for (size_t i = 0; i < dustnodes.size(); ++i)
 		{
 			core::vector3df dustpos = dustnodes[i]->getPosition();
@@ -405,11 +371,14 @@ int main()
 		core::vector3df target = (camera->getTarget() - camera->getAbsolutePosition());
 		core::vector3df relativeRotation = target.getHorizontalAngle();
 
-		if (receiver.IsKeyDown(irr::KEY_PLUS))
+		if (receiver.IsKeyDown(irr::KEY_ESCAPE))
+		{
+			break;
+		}
+		else if (receiver.IsKeyDown(irr::KEY_PLUS))
 		{
 			MOVEMENT_SPEED_TARGET += MOVEMENT_SPEED_INCREMENT * frameDeltaTime;
 			MOVEMENT_SPEED_TARGET = (MOVEMENT_SPEED_TARGET > MOVEMENT_SPEED_MAX_STANDARD) ? MOVEMENT_SPEED_MAX_STANDARD : MOVEMENT_SPEED_TARGET;
-
 		}
 		else if (receiver.IsKeyDown(irr::KEY_MINUS))
 		{
@@ -451,25 +420,28 @@ int main()
 			if ((receiver.GetMouseState().Position.X < (DISPLAY_WIDTH/2)-MOUSE_MAX))
 				device->getCursorControl()->setPosition((DISPLAY_WIDTH / 2)-MOUSE_MAX+MOUSE_BOUNCE, device->getCursorControl()->getPosition().Y);
 		}
-		else {
+		else
+		{
 			MOVEMENT_TURN = 0;
 		}
 
-		if (device->getCursorControl()->getPosition().Y < ((DISPLAY_HEIGHT/2)/*-MOUSE_DEAD*/))
+		if (device->getCursorControl()->getPosition().Y < ((DISPLAY_HEIGHT/2)))
 		{
-			MOVEMENT_PITCH = (((DISPLAY_HEIGHT/2)/*-MOUSE_DEAD*/) - device->getCursorControl()->getPosition().Y);
+			MOVEMENT_PITCH = ((static_cast<irr::f32>(DISPLAY_HEIGHT/2)) - device->getCursorControl()->getPosition().Y);
 			if ((receiver.GetMouseState().Position.Y < (DISPLAY_HEIGHT / 2)-MOUSE_MAX))
 				device->getCursorControl()->setPosition(device->getCursorControl()->getPosition().X, (DISPLAY_HEIGHT/2)-MOUSE_MAX+MOUSE_BOUNCE);
-		}
-		else if (device->getCursorControl()->getPosition().Y > (DISPLAY_HEIGHT/2)/*+MOUSE_DEAD*/)
+		} 
+		else if (device->getCursorControl()->getPosition().Y > (DISPLAY_HEIGHT/2))
 		{
-			MOVEMENT_PITCH = 0-((device->getCursorControl()->getPosition().Y - (DISPLAY_HEIGHT / 2) /*+ MOUSE_DEAD*/));
+			MOVEMENT_PITCH = 0-((device->getCursorControl()->getPosition().Y - (static_cast<irr::f32>(DISPLAY_HEIGHT / 2))));
 			if ((receiver.GetMouseState().Position.Y > (DISPLAY_HEIGHT/2)+MOUSE_MAX))
 				device->getCursorControl()->setPosition(device->getCursorControl()->getPosition().X, (DISPLAY_HEIGHT/2)+MOUSE_MAX-MOUSE_BOUNCE);
 		}
-		else {
+		else
+		{
 				MOVEMENT_PITCH = 0;
 		}
+
 		if (MOVEMENT_SPEED > 0)
 		{
 			pitch(test, ((MOVEMENT_PITCH / MOUSE_MAX * MOVEMENT_PITCH_MAX)) * frameDeltaTime);
@@ -477,7 +449,6 @@ int main()
 		}
 		else {
 			device->getCursorControl()->setPosition((DISPLAY_WIDTH/2), (DISPLAY_HEIGHT/2));
-
 		}
 		
 		/* Tend towards desired speed */
@@ -497,40 +468,70 @@ int main()
 		strtargetspeed += L" m/s";
 		textTargetSpeed->setText(strtargetspeed.c_str());
 
-		/*stringw strpitch = L"Pitch: ";
-		strpitch += (int)round((MOVEMENT_PITCH / MOUSE_MAX * MOVEMENT_PITCH_MAX));
-		strpitch += L" deg/s";
-		textPitch->setText(strpitch.c_str());
-		makeCockpit(camera, test, vector3df(0, 0, 0));
-
-		stringw strturn = L"Turn: ";
-		strturn += (int)round(0 - (MOVEMENT_TURN / MOUSE_MAX * MOVEMENT_TURN_MAX));
-		strturn += L" deg/s";
-		textTurn->setText(strturn.c_str());*/
-
-
 		makeCockpit(camera, test, vector3df(0, 0, 0));
 
 		/* Render */
 		/**********************************************************************************************/
 		driver->beginScene(true, true, SColor(100, 100, 100, 100));
 
-
-
-
 		smgr->drawAll();
 		guienv->drawAll();
+
+		// Crosshair
 		driver->draw2DImage(sightimages, core::position2d<s32>((DISPLAY_WIDTH/2) - 41, (DISPLAY_HEIGHT / 2) - 41), core::rect<s32>(1, 1, 88, 74), 0, SColor(255, 255, 255, 255), true);
 
 		// H
-		driver->draw2DImage(sightimages, core::position2d<s32>((DISPLAY_WIDTH / 2) - (54/2), (DISPLAY_HEIGHT / 2) - 50), core::rect<s32>(126, 1, 179, 7), 0, SColor(255, 255, 255, 255), true);
-		driver->draw2DImage(sightimages, core::position2d<s32>((DISPLAY_WIDTH / 2) + ((MOVEMENT_TURN / MOUSE_MAX) * 26) - 2, (DISPLAY_HEIGHT / 2) - 40), core::rect<s32>(120, 1, 123, 6), 0, SColor(255, 255, 255, 255), true);
+        driver->draw2DImage(
+           sightimages, 
+           core::position2d<s32>(
+               static_cast<s32>((DISPLAY_WIDTH / 2) - (54 / 2)), 
+               static_cast<s32>((DISPLAY_HEIGHT / 2) - 50)
+           ), 
+           core::rect<s32>(126, 1, 179, 7), 
+           0, 
+           SColor(255, 255, 255, 255), 
+           true
+        );
+
+		driver->draw2DImage(
+           sightimages, 
+           core::position2d<s32>(
+               static_cast<s32>((DISPLAY_WIDTH / 2) + ((MOVEMENT_TURN / MOUSE_MAX) * 26) - 2), 
+               static_cast<s32>((DISPLAY_HEIGHT / 2) - 40)
+           ), 
+           core::rect<s32>(120, 1, 123, 6), 
+           0, 
+           SColor(255, 255, 255, 255), 
+           true
+        );
 
 		// V
-		driver->draw2DImage(sightimages, core::position2d<s32>((DISPLAY_WIDTH / 2) - 50, (DISPLAY_HEIGHT / 2) - (52/2)), core::rect<s32>(126, 10, 132, 63), 0, SColor(255, 255, 255, 255), true);
-		driver->draw2DImage(sightimages, core::position2d<s32>((DISPLAY_WIDTH / 2) - 41, (DISPLAY_HEIGHT / 2) + ((MOVEMENT_PITCH / MOUSE_MAX) * 26)), core::rect<s32>(112, 1, 117, 4), 0, SColor(255, 255, 255, 255), true);
+        driver->draw2DImage(  
+           sightimages,  
+           core::position2d<s32>(  
+               static_cast<s32>((DISPLAY_WIDTH / 2) - 50),  
+               static_cast<s32>((DISPLAY_HEIGHT / 2) - (52 / 2))  
+           ),  
+           core::rect<s32>(126, 10, 132, 63),  
+           0,  
+           SColor(255, 255, 255, 255),  
+           true  
+        );  
+
+        driver->draw2DImage(  
+           sightimages,  
+           core::position2d<s32>(  
+               static_cast<s32>((DISPLAY_WIDTH / 2) - 41),  
+               static_cast<s32>((DISPLAY_HEIGHT / 2) + ((MOVEMENT_PITCH / MOUSE_MAX) * 26))  
+           ),  
+           core::rect<s32>(112, 1, 117, 4),  
+           0,  
+           SColor(255, 255, 255, 255),  
+           true  
+        );
 
 		// Throttle
+		// ???
 
 		driver->endScene();
 		/**********************************************************************************************/
@@ -549,26 +550,14 @@ int main()
 		}
 		/**********************************************************************************************/
 
-
-
 		shieldnode->setPosition(camera->getAbsolutePosition());
 
-		/*asteroidnode->setDebugDataVisible(scene::EDS_BBOX | scene::EDS_MESH_WIRE_OVERLAY);
-		planetnode->setDebugDataVisible(scene::EDS_BBOX | scene::EDS_MESH_WIRE_OVERLAY);
-		shieldnode->setDebugDataVisible(scene::EDS_BBOX | scene::EDS_MESH_WIRE_OVERLAY);*/
+		asteroidnode->setDebugDataVisible(scene::EDS_BBOX);
+		planetnode->setDebugDataVisible(scene::EDS_BBOX);
+		shieldnode->setDebugDataVisible(scene::EDS_BBOX);
 		if (asteroidnode->getTransformedBoundingBox().intersectsWithBox(shieldnode->getTransformedBoundingBox()))
 		{
 				snddevice->play2D("assets/sounds/shldhit.ogg", false);
-				for (unsigned int i = 0; i < shieldnode->getMaterialCount(); i++) {
-					shieldnode->getMaterial(i).BackfaceCulling = false;
-					shieldnode->getMaterial(i).FrontfaceCulling = false;
-				}
-		}
-		else {
-			for (unsigned int i = 0; i < shieldnode->getMaterialCount(); i++) {
-				shieldnode->getMaterial(i).BackfaceCulling = true;
-				shieldnode->getMaterial(i).FrontfaceCulling = true;
-			}
 		}
 	}
 
